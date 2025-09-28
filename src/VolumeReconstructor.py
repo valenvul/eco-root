@@ -6,149 +6,170 @@ import scipy.ndimage as nd
 import os.path
 import dicom_utils
 
-#class VolumeReconstructor:
-#    def __init__(self, pathToVideo, mask):
+class VolumeReconstructor:
+    def __init__(self, video_path, mask_path, sampling_rate=3, voxel_spacing=(1,1,3)):
+        """
+        Initialize VolumeReconstructor with basic parameters
+        
+        Args:
+            video_path: str
+            Path to the input video file
+            mask_path: str
+            Path to the mask image file
+            sampling_rate: int
+            Number of samples per second (default: 3)
+        """
+        # Store input paths and parameters
+        self.video_path = video_path
+        self.mask_path = mask_path
+        self.sampling_rate = sampling_rate
+        self.voxel_spacing = voxel_spacing
+        
+        # Load the mask
+        self.mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        
+        # Processing parameters (with defaults from original code)
+        self.start_frame = 0
+        self.end_frame = -1
+        self.equalize = False
+        
+        # Results will be stored here
+        self.volume = None
+        self.segmented_volume = None
+    
+    # set up methods
 
-def skeleton(mask):
+    def extract_video_parameters(self):
+        """
+        Extract video parameters like FPS and total number of frames
+        
+        Returns:
+            fps: int
+            total_frames: int
+        """
+        cap = cv2.VideoCapture(self.video_path)
+        
+        # Extract video parameters (same as original code)
+        fps = cap.get(cv2.CAP_PROP_FPS)  # gets video's fps rate
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  # gets total number of frames in the video
 
+        # Close the video capture
+        cap.release()
+        
+        # Print info (same as original)
+        print(f"FPS: {fps}")
+        print(f"Total number of frames: {total_frames}")
+        
+        return fps, total_frames
 
-    # Lobster from http://www9.informatik.uni-erlangen.de/External/vollib/
-    # pvm2raw from http://sourceforge.net/projects/volren/?source=typ_redirect
-    # ./pvm2raw Lobster.pvm Lobster.raw
-    # reading PVM file
-    # found volume with width=301 height=324 depth=56 components=1
-    # and edge length 1/1/1.4
-    # and data checksum=CFCD4D44
+    def get_frames_to_sample(self):
+        """
+        Calculate which frames to sample based on the sampling rate
+        
+        Returns:
+            list: list[int]
+            List of frame indices to sample
+        """
+        fps, total_frames = self.extract_video_parameters()
+    
+        if self.end_frame == -1:
+            self.end_frame = int(total_frames - 1)
+        
+        step_sampling = int(fps // self.sampling_rate)
+        frames_to_sample = list(range(self.start_frame, self.end_frame + 1, step_sampling))
 
-    mask = nd.binary_dilation(mask, structure=morphology.ball(3))
-    mask = nd.binary_fill_holes(mask)
+        print(f"Frames to sample: {frames_to_sample}")
+        
+        return frames_to_sample
 
-    mask = nd.binary_erosion(mask, structure=morphology.ball(3))
+    def extract_mask_bounding_box(self):
+        """
+        Extract mask bounding box - finds the min and max coordinates where the mask is white
+        
+        Returns:
+            tuple: (min_coords, max_coords, size)
+                min_coords: numpy array with minimum coordinates [y, x]
+                max_coords: numpy array with maximum coordinates [y, x] 
+                size: numpy array with size [height, width]
+        """
+        # Find all white pixels in the mask (same as original code)
+        white_pixels = np.argwhere(self.mask == 255)
+        
+        if len(white_pixels) == 0:
+            raise ValueError("Mask appears to be empty - no white pixels found")
+        
+        # Find min and max coordinates where the mask is white
+        min_coords = np.min(white_pixels, axis=0)
+        max_coords = np.max(white_pixels, axis=0)
+        
+        # Calculate size
+        size = max_coords - min_coords
+        
+        # Print info (same as original)
+        print(f"Mask size: {size}")
+        
+        return min_coords, max_coords, size
 
-    # 3D skeletonization from ITK/SimpleITK
-    res = sitk.BinaryThinning(mask)
-    # np_res = sitk.GetArrayFromImage(res)
+    # reconstruction methods
 
-    sitk.WriteImage(res, "res.nii.gz")
+    def extract_and_crop_frames(self):
+        """
+        Create volumetric container and extract/crop frames from video
+        
+        Returns:
+            numpy.ndarray: 3D volume with cropped frames (z, y, x)
+        """
+        # Get the frames to sample and mask bounding box
+        frames_to_sample = self.get_frames_to_sample()
+        min_coords, max_coords, size = self.extract_mask_bounding_box()
+        fps, total_frames = self.extract_video_parameters()
+        
+        # Create volumetric image container
+        # array to store the sampled frames cropped according to the mask size
+        vol = np.zeros(shape=(len(frames_to_sample), size[0], size[1]), dtype=float)
+        
+        print(f"Created volumetric container with shape: {vol.shape}")
+        
+        cap = cv2.VideoCapture(self.video_path)
+        
+        i = 0  # current frame index
+        z = 0  # volume depth index
+        ret = True
+        
+        while i < total_frames and ret:
+            ret, frame = cap.read()
+            
+            if not ret:
+                break
+                            
+            if len(frame.shape) == 3:
+                # Color image - convert to grayscale
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            else:
+                # Already grayscale
+                gray = frame
+            
+            if i in frames_to_sample:
+                if self.equalize:
+                    gray = cv2.equalizeHist(gray)
+                
+                # Crop frame according to mask bounding box
+                cropped = gray[min_coords[0]:max_coords[0], min_coords[1]:max_coords[1]]
+                
+                vol[z, :, :] = cropped
+                
+                z += 1
+                            
+            i += 1
+        
+        cap.release()
+        
+        output = sitk.GetImageFromArray(vol)   
+        output.SetSpacing(self.voxel_spacing)
 
-# ======================= Configuration ================================================================
+        self.volume = output
+        
+        print(f"Volume extraction completed. Final shape: {vol.shape}")
+        return output
 
-# read dicom file
-video_path = open_dicom.extract_dicom_video("primera_prueba/imagen_3361207482046.dcm")
-
-# Input video
-inputVideo = video_path
-
-# Mask to crop the video before generating the volume
-mask =  cv2.imread("mascara.png", cv2.IMREAD_GRAYSCALE)
-
-# Number of samples per second that will be sampled from the video
-samplingRate = 3
-
-# Start frame
-startFrame = 0
-
-# End Frame
-endFrame = -1
-
-# ======================= Pre-processing steps ===============================================
-
-# Equalize?
-equalize = False
-
-# ======================= Code ================================================================
-
-# Extract video parameters ...
-
-cap = cv2.VideoCapture(inputVideo)
-
-fps= cap.get(5) # gets video's fps rate
-
-totalFrames = cap.get(7) # gets total number of frames in the video
-
-if endFrame == -1:
-    endFrame = int(totalFrames - 1)
-
-stepSampling = int(fps // samplingRate)
-
-framesToSample = list(range(startFrame, endFrame + 1, stepSampling)) # samples the video
-
-
-print( "FPS: " + str(fps))
-print ("Total number of frames: " + str(totalFrames))
-print ("Frames to sample " + str(framesToSample))
-
-# Extract mask bounding box
-# finds the min and max where thw mask is white
-minCoords = np.min(np.argwhere(mask == 255), axis=0)
-maxCoords = np.max(np.argwhere(mask == 255), axis=0)
-
-size = maxCoords - minCoords
-
-print ("Mask size" + str(size))
-
-# Create volumetric image container
-
-# array to store the sampled frames cropped according to the mask size
-vol = np.zeros(shape=(len(framesToSample),size[0],size[1]), dtype=float)
-
-#sitk.Image(size[0],size[1],len(framesToSample),sitk.sitkUInt8)
-
-i = 0
-z = 0
-ret = True
-
-while i<totalFrames:
-    ret, frame = cap.read()
-    print (i)
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-    if i in framesToSample:
-#        cv2.imwrite(os.path.join(outDir, str(i) + ".png"), gray)
-        if equalize:
-            gray = cv2.equalizeHist(gray)
-
-        # crops the sampled frame according to the mask bounding box
-        vol[z,:,:] = gray[minCoords[0]:maxCoords[0],minCoords[1]:maxCoords[1]]
-
-        z += 1
-
-        print ("Filling Z: " + str(z))
-
-    i+=1
-
-output = sitk.GetImageFromArray(vol)
-output.SetSpacing((1,1,5)) # sets spacing for the voxels, defines real worls size of eaxh voxel
-
-# Post-processing steps:
-
-# Gaussian filter
-#output = sitk.GradientMagnitudeRecursiveGaussian(output, sigma=.1)
-
-# Median filter
-median = sitk.MedianImageFilter() # removes noise
-output = median.Execute(output)
-
-
-
-# Otsu
-
-# segmentates the object from the background
-otsu_filter = sitk.OtsuThresholdImageFilter() # automatically finds threshold
-otsu_filter.SetInsideValue(0) # sets the pixel value for the background as 0
-otsu_filter.SetOutsideValue(1) # sets the pixel value for the object as 1
-seg = otsu_filter.Execute(output) # applies the filter
-# seg = sitk.BinaryFillhole(seg)
-# seg = sitk.BinaryMorphologicalOpening(seg)
-
-
-# Write output
-
-# Output dir where the volume will be stored
-if not os.path.exists("tmp2"):
-    os.makedirs("tmp2")
-outVol = "tmp2/vol.nii.gz"
-outSeg = "tmp2/vol_seg.nii.gz"
-
-sitk.WriteImage(output, outVol)
-sitk.WriteImage(seg, outSeg)
+    

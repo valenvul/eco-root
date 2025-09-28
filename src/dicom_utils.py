@@ -10,6 +10,10 @@ def  extract_video(dicom_file_path):
     input: dicom_file_path: str
     output: video_path: str
     """
+
+    # Check if file has .dcm extension
+    if not dicom_file_path.lower().endswith('.dcm'):
+        raise ValueError(f"File must have .dcm extension. Got: {dicom_file_path}")
     
     dicom_data = pydicom.dcmread(dicom_file_path)
 
