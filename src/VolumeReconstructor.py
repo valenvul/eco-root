@@ -77,8 +77,6 @@ class VolumeReconstructor:
         
         step_sampling = int(fps // self.sampling_rate)
         frames_to_sample = list(range(self.start_frame, self.end_frame + 1, step_sampling))
-
-        print(f"Frames to sample: {frames_to_sample}")
         
         return frames_to_sample
 
@@ -112,7 +110,7 @@ class VolumeReconstructor:
 
     # reconstruction methods
 
-    def extract_and_crop_frames(self):
+    def create_volume(self):
         """
         Create volumetric container and extract/crop frames from video
         
