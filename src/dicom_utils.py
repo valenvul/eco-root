@@ -52,3 +52,33 @@ def  extract_video(dicom_file_path):
     out.release()
 
     return video_path
+
+def rename_dicom_files_sequentially(dicom_folder):
+    """
+    Rename DICOM files in a folder sequentially based on their acquisition time.
+
+    Args:
+        dicom_folder (str): Path to the folder containing DICOM files.
+    """
+
+    print(f"Renaming files in {dicom_folder} based on acquisition time...")
+
+    dicom_files = [f for f in os.listdir(dicom_folder) if f.endswith(".dcm")]
+
+    # Extract acquisition time and associate with filename
+    file_times = []
+    for f in dicom_files:
+        ds = pydicom.dcmread(os.path.join(dicom_folder, f), stop_before_pixels=True)
+        time = ds.get("AcquisitionTime", "000000")
+        file_times.append((f, time))
+
+    # Sort by time
+    file_times.sort(key=lambda x: x[1])
+
+    # Rename or number sequentially
+    for idx, (f, t) in enumerate(file_times, 1):
+        old_path = os.path.join(dicom_folder, f)
+        new_filename = f"{idx:03d}.dcm"  
+        new_path = os.path.join(dicom_folder, new_filename)
+        os.rename(old_path, new_path)
+        print(f"{f} -> {new_filename}")
