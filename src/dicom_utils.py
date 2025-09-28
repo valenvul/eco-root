@@ -37,13 +37,13 @@ def  extract_video(dicom_file_path):
     # Define codec and create VideoWriter object
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     fps = float(dicom_data.get('CineRate', 30))  # Use 30 fps by default if not present
-    out = cv2.VideoWriter(video_path, fourcc, fps, (width, height), isColor=len(frames.shape) == 4)
+    out = cv2.VideoWriter(video_path, fourcc, fps, (width, height), isColor=False)
 
     # Write frames to video 
     for i in range(num_frames):
         frame = frames[i]
-        if len(frame.shape) == 2:  
-            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        if len(frame.shape) == 3:  # Convert color to grayscale
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         out.write(frame.astype(np.uint8))
     out.release()
 
