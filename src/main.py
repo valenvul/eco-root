@@ -1,7 +1,7 @@
 import os
 import SimpleITK as sitk
 from dicom_utils import extract_video
-from NewVolumeReconstructor import VolumeReconstructor
+from VolumeReconstructor import VolumeReconstructor
 
 # ------------------- SET UP ------------------
 # Extract videos from DICOM files
@@ -52,4 +52,41 @@ for filename in os.listdir(extracted_videos_dir):
             
         except Exception as e:
             print(f"Error processing {filename}: {e}")
+
+# -------------------- REGISTRATION ------------------
+# -------------------- SEGMENTATION ------------------
+
+# Read volume
+volume_path = "data/volumes/volume_lado_1.nii.gz"
+volume = sitk.ReadImage(volume_path)
+
+# Gaussian filter
+#output = sitk.GradientMagnitudeRecursiveGaussian(output, sigma=.1)
+
+# Median filter
+median = sitk.MedianImageFilter() # removes noise
+output = median.Execute(volume)
+
+# Otsu
+
+# segmentates the object from the background
+otsu_filter = sitk.OtsuThresholdImageFilter() # automatically finds threshold
+otsu_filter.SetInsideValue(0) # sets the pixel value for the background as 0
+otsu_filter.SetOutsideValue(1) # sets the pixel value for the object as 1
+seg = otsu_filter.Execute(volume) # applies the filter
+# seg = sitk.BinaryFillhole(seg)
+# seg = sitk.BinaryMorphologicalOpening(seg)
+
+
+# Write output
+
+# Output dir where the volume will be stored
+if not os.path.exists('data/results'):
+    os.makedirs("data/results")
+outVol = "data/results/vol.nii.gz"
+outSeg = "data/results/vol_seg.nii.gz"
+
+sitk.WriteImage(output, outVol)
+sitk.WriteImage(seg, outSeg)
+
             

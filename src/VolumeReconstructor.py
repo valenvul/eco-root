@@ -7,7 +7,7 @@ import os.path
 import dicom_utils
 
 class VolumeReconstructor:
-    def __init__(self, video_path, mask_path, sampling_rate=3, voxel_spacing=(1,1,3)):
+    def __init__(self, video_path, mask_path, sampling_rate=3, voxel_spacing=(1,1,5)):
         """
         Initialize VolumeReconstructor with basic parameters
         
