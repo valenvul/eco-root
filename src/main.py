@@ -2,7 +2,7 @@ import os
 from dicom_utils import extract_video
 
 # ------------------- SET UP ------------------
-# Extraer videos de los archivos .dcm
+# Extract videos from DICOM files
 
 input_dir = 'primera_prueba'
 
@@ -16,6 +16,6 @@ for filename in os.listdir(input_dir):
             print(f"No se pudo extraer video de {input_path}: {e}")
 
 
-# -------------------- RECONSTRUCCIÓN DE VOLUMEN ------------------
-# Generar una reconstrucción volumétrica de cada ángulo adquirido
+# -------------------- VOLUME RECONSTRUCTION ------------------
+# Generate volume reconstruction for each view
 

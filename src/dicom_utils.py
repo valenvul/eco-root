@@ -5,43 +5,44 @@ import os
 
 def  extract_video(dicom_file_path):
     """
-    input: file_path: str
-        path al archivo .dcm
+    Extracts video from a DICOM file and saves it as an AVI file.
+
+    input: dicom_file_path: str
     output: video_path: str
-        path al video extraido del dicom
     """
-    # Leer el archivo DICOM
+    
     dicom_data = pydicom.dcmread(dicom_file_path)
 
-    # Verificar si el archivo DICOM contiene un video
+    # Check if the DICOM file contains pixel data
     if 'PixelData' not in dicom_data:
-        raise ValueError("El archivo DICOM no contiene datos de píxeles.")
+        raise ValueError("DICOM file does not contain pixel data.")
 
-    # Extraer los frames del DICOM
     frames = dicom_data.pixel_array
-    # si es B y N
+
+    # Get frame dimensions
+    # grayscale
     if len(frames.shape) == 3:
         num_frames, height, width = frames.shape
-    # si es RGB
+    #color
     if len(frames.shape) == 4:
         num_frames, height, width, _ = frames.shape
     else:
-        raise ValueError("Formato de frames no soportado.")
+        raise ValueError("Unsupported frame shape in DICOM file.")
 
-    # Crear carpeta de salida si no existe
+    # Create output directory if it doesn't exist
     output_dir = "videos"
     os.makedirs(output_dir, exist_ok=True)
     video_path = os.path.join(output_dir, os.path.splitext(os.path.basename(file_path.split('/')[-1]))[0] + ".AVI")
 
-    # Definir el codec y crear el objeto VideoWriter
+    # Define codec and create VideoWriter object
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    fps = float(dicom_data.get('CineRate', 30))  # Usar 30 fps por defecto si no está presente
+    fps = float(dicom_data.get('CineRate', 30))  # Use 30 fps by default if not present
     out = cv2.VideoWriter(video_path, fourcc, fps, (width, height), isColor=len(frames.shape) == 4)
 
-    # Escribir los frames en el video
+    # Write frames to video 
     for i in range(num_frames):
         frame = frames[i]
-        if len(frame.shape) == 2:  # Escala de grises
+        if len(frame.shape) == 2:  
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
         out.write(frame.astype(np.uint8))
     out.release()
