@@ -30,9 +30,9 @@ def  extract_video(dicom_file_path):
         raise ValueError("Unsupported frame shape in DICOM file.")
 
     # Create output directory if it doesn't exist
-    output_dir = "videos"
+    output_dir = "data/videos"
     os.makedirs(output_dir, exist_ok=True)
-    video_path = os.path.join(output_dir, os.path.splitext(os.path.basename(file_path.split('/')[-1]))[0] + ".AVI")
+    video_path = os.path.join(output_dir, os.path.splitext(os.path.basename(dicom_file_path))[0] + ".AVI")
 
     # Define codec and create VideoWriter object
     fourcc = cv2.VideoWriter_fourcc(*'XVID')

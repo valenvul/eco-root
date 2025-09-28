@@ -23,6 +23,7 @@ class VolumeReconstructor:
         self.video_path = video_path
         self.mask_path = mask_path
         self.sampling_rate = sampling_rate
+        self.voxel_spacing = voxel_spacing
         
         # Load the mask
         self.mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
@@ -140,9 +141,7 @@ class VolumeReconstructor:
             
             if not ret:
                 break
-                
-            print(f"Processing frame {i}")
-            
+                            
             if len(frame.shape) == 3:
                 # Color image - convert to grayscale
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -170,9 +169,9 @@ class VolumeReconstructor:
         output = sitk.GetImageFromArray(vol)   
         output.SetSpacing(self.voxel_spacing)
 
-        self.volume = vol
+        self.volume = output
         
         print(f"Volume extraction completed. Final shape: {vol.shape}")
-        return vol
+        return output
 
     
