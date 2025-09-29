@@ -3,6 +3,7 @@ import SimpleITK as sitk
 import numpy as np
 from dicom_utils import extract_video, rename_dicom_files_sequentially
 from volumeReconstructor import VolumeReconstructor
+from volumeRegistrator import VolumeRegistrator
 from itertools import product
 
 # ------------------- SET UP ------------------
@@ -74,61 +75,9 @@ print("\n" + "="*50)
 print("VOLUME REGISTRATION AND FUSION")
 print("="*50)
 
-volumes_output_dir = "data/volumes"  
-output_path = "data/results/final_volume.nii.gz"
-angle_per_side = 60 
-if not os.path.exists('data/results'):
-    os.makedirs('data/results')
-
-filenames = sorted([os.path.join(volumes_output_dir, f)
-                    for f in os.listdir(volumes_output_dir) if f.endswith(".nii.gz")])
-volumes = [sitk.ReadImage(fn, sitk.sitkFloat32) for fn in filenames]
-names = [os.path.basename(fn).replace('.nii.gz','') for fn in filenames]
-
-if len(volumes) != 6:
-    raise ValueError("Expected exactly 6 volumes for a hexagon.")
-
-# Use the geometric center of the first volume as the pot center
-fixed = volumes[0]
-size = np.array(fixed.GetSize())
-spacing = np.array(fixed.GetSpacing())
-center = fixed.TransformContinuousIndexToPhysicalPoint(size / 2)
-
-# Create a larger volume for the hexagon
-max_dim = max(size * spacing) * 1.5 
-new_spacing = spacing
-new_size = [int(max_dim / s) for s in new_spacing]
-
-reference = sitk.Image(new_size, sitk.sitkFloat32)
-reference.SetSpacing(new_spacing)
-reference.SetOrigin(np.array(center) - np.array(reference.GetSpacing()) * np.array(reference.GetSize()) / 2)
-reference.SetDirection(fixed.GetDirection())
-
-fused_array = np.zeros(sitk.GetArrayFromImage(reference).shape, dtype=np.float32)
-count_array = np.zeros_like(fused_array, dtype=np.float32)
-
-for i, vol in enumerate(volumes):
-    print(f"Processing volume {i} ({names[i]})...")
-    t = sitk.Euler3DTransform()
-    t.SetCenter(center)  # rotate around pot center
-    t.SetRotation(0, 0, np.deg2rad(i * angle_per_side))  # rotate around z-axis
-
-    resampled = sitk.Resample(vol, reference, t, sitk.sitkLinear, 0.0, vol.GetPixelID())
-    arr = sitk.GetArrayFromImage(resampled)
-    mask = arr > 0
-    fused_array[mask] += arr[mask]
-    count_array[mask] += 1
-
-# Normalize fused volume
-count_array[count_array == 0] = 1  # avoid division by zero
-fused_array /= count_array
-
-fused_img = sitk.GetImageFromArray(fused_array)
-fused_img.CopyInformation(reference)
-
-# Save fused volume
-sitk.WriteImage(fused_img, output_path)
-print(f"Fused hexagonal volume saved to: {output_path}")
+volumes_dir = "data/volumes"  
+registrator = VolumeRegistrator(volumes_dir)
+fused_img = registrator.process_volumes()
 
 # -------------------- SEGMENTATION ------------------
 print("\n" + "="*50)
@@ -138,7 +87,7 @@ print("="*50)
 print("Applying segmentation to the final fused volume...")
 
 # Use the fused volume for segmentation
-volume = fused_img
+volume = sitk.ReadImage(fused_img)
 
 # Gaussian filter (optional - uncomment if needed for noise reduction)
 # volume = sitk.GradientMagnitudeRecursiveGaussian(volume, sigma=0.1)
