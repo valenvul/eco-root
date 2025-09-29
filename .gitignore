@@ -28,6 +28,5 @@ venv.bak/
 *.dcm
 *.nii.gz
 *.AVI
-*.bmp
-*.png
-datos*/
+*.bpm
+datos enzo
