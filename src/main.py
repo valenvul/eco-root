@@ -5,6 +5,7 @@ from dicom_utils import extract_video, rename_dicom_files_sequentially
 from volumeReconstructor import VolumeReconstructor
 from volumeRegistrator import VolumeRegistrator
 from itertools import product
+from preprocessing import volume_denoising
 
 # ------------------- SET UP ------------------
 # Extract videos from DICOM files
@@ -51,22 +52,35 @@ for filename in os.listdir(extracted_videos_dir):
     if os.path.isfile(video_path) and filename.endswith('.AVI'):
         try:
             print(f"\nProcessing video: {filename}")
-            
+    
             # Create reconstructor and extract volume
             reconstructor = VolumeReconstructor(video_path, mask_path=mask_path)
             volume = reconstructor.create_volume()
-            
+    
             # Generate output filename
             base_name = os.path.splitext(filename)[0]  # Remove .AVI extension
             output_filename = f"volume_{base_name}.nii.gz"
             output_path = os.path.join(volumes_output_dir, output_filename)
-            
+    
             # Save volume
             sitk.WriteImage(volume, output_path)
             print(f"Volume saved to: {output_path}")
-            
+    
         except Exception as e:
             print(f"Error processing {filename}: {e}")
+
+# -------------------- VOLUME PREPROCESSING ------------------
+print("\n" + "="*50)
+print("PREPROCESSING")
+print("="*50)
+
+for filename in os.listdir(volumes_output_dir):
+    if not filename.endswith('.nii.gz'):
+        continue
+    img = sitk.ReadImage(os.path.join(volumes_output_dir, filename))
+    img_denoised = volume_denoising(img)
+    sitk.WriteImage(img_denoised, os.path.join(volumes_output_dir, filename))
+    print(f"Denoised volume saved to: {os.path.join(volumes_output_dir, filename)}")    
 
 # -------------------- REGISTRATION ------------------
 # Perform volume registration and fusion
@@ -120,3 +134,6 @@ print(f"Filtered final volume saved to: {outVol}")
 print(f"Segmented final volume saved to: {outSeg}")
 
             
+
+
+
