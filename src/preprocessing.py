@@ -16,7 +16,7 @@ def volume_denoising(volume):
     """
     denoised_volume = sitk.CurvatureAnisotropicDiffusion(
         volume,
-        timeStep=0.0625,  
+        timeStep=0.0116,  
         conductanceParameter=0.7,
         numberOfIterations=20
     )

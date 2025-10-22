@@ -15,7 +15,7 @@ print("VIDEO EXTRACTION")
 print("="*50)
 
 
-input_dir = 'data/ultrasound'
+input_dir = 'data/ultrasound/segunda_medicion/vascular_50_9'
 
 rename_dicom_files_sequentially(input_dir)
 
@@ -45,7 +45,7 @@ volumes_output_dir = 'data/volumes'
 if not os.path.exists(volumes_output_dir):
     os.makedirs(volumes_output_dir)
 
-mask_path = "data/crop_masks/mascara.png" 
+mask_path = "data/crop_masks/mascara_no_borders.png" 
 
 for filename in os.listdir(extracted_videos_dir):
     video_path = os.path.join(extracted_videos_dir, filename)
@@ -54,7 +54,7 @@ for filename in os.listdir(extracted_videos_dir):
             print(f"\nProcessing video: {filename}")
     
             # Create reconstructor and extract volume
-            reconstructor = VolumeReconstructor(video_path, mask_path=mask_path)
+            reconstructor = VolumeReconstructor(video_path, mask_path=mask_path, voxel_spacing=(0.187,0.188,3.95))
             volume = reconstructor.create_volume()
     
             # Generate output filename
@@ -119,8 +119,8 @@ otsu_filter.SetOutsideValue(1)  # sets the pixel value for the object as 1
 seg = otsu_filter.Execute(filtered_volume)
 
 # Optional morphological operations (uncomment if needed)
-# seg = sitk.BinaryFillhole(seg)
-# seg = sitk.BinaryMorphologicalOpening(seg)
+seg = sitk.BinaryFillhole(seg)
+seg = sitk.BinaryMorphologicalOpening(seg)
 
 # Write output files
 print("Saving segmented volumes...")
